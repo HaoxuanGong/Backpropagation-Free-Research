@@ -6,6 +6,9 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from utils import prepare_data
 from sklearn.metrics import accuracy_score
+from sklearn.cluster import KMeans
+import numpy as np
+
 
 
 def goodness_score(pos_acts, neg_acts, threshold=2):
@@ -64,7 +67,6 @@ class FF_Layer(nn.Linear):
         input = self.ln_layer(input.detach())
         return input
 
-
 class Unsupervised_FF(nn.Module):
     def __init__(self, n_layers: int = 4, n_neurons=2000, input_size: int = 28 * 28, n_epochs: int = 100,
                  bias: bool = True, n_classes: int = 10, n_hid_to_log: int = 3, device=torch.device("cuda:0")):
@@ -80,7 +82,7 @@ class Unsupervised_FF(nn.Module):
                      bias=bias,
                      device=device) for idx in range(n_layers)]
 
-        self.ff_layers = ff_layers
+        self.ff_layers = nn.ModuleList(ff_layers)
         self.last_layer = nn.Linear(in_features=n_neurons * n_hid_to_log, out_features=n_classes, bias=bias)
         self.to(device)
         self.opt = torch.optim.Adam(self.last_layer.parameters())
@@ -129,7 +131,7 @@ class Unsupervised_FF(nn.Module):
             image = layer(image)
             if idx > len(self.ff_layers) - self.n_hid_to_log - 1:
                 concat_output.append(image)
-        concat_output = torch.concat(concat_output, 2)
+        concat_output = torch.cat(concat_output, 2)
         logits = self.last_layer(concat_output)
         return logits.squeeze()
 
@@ -145,8 +147,8 @@ class Unsupervised_FF(nn.Module):
             preds = torch.argmax(preds, 1)
             all_labels.append(labels.detach().cpu())
             all_preds.append(preds.detach().cpu())
-        all_labels = torch.concat(all_labels, 0).numpy()
-        all_preds = torch.concat(all_preds, 0).numpy()
+        all_labels = torch.cat(all_labels, 0).numpy()
+        all_preds = torch.cat(all_preds, 0).numpy()
         metrics_dict = get_metrics(all_preds, all_labels)
         print(f"{dataset_type} dataset scores: ", "\n".join([f"{key}: {value}" for key, value in metrics_dict.items()]))
 
@@ -166,7 +168,6 @@ def plot_loss(loss):
     plt.title("Loss Plot")
     plt.savefig("Loss Plot.png")
     plt.show()
-
 
 if __name__ == '__main__':
     prepare_data()

@@ -31,31 +31,6 @@ class BlackBoxModel(nn.Module):
         x = self.activation(self.layer1(x))
         x = self.activation(self.layer2(x))
         return x
-    
-'''
-    for epoch in range(num_epochs):
-        for data, target in train_loader:
-        # Assuming 'data' is input and 'target' is the expected output
-        
-        # Part 1: Process input through the initial custom layer(s) up to the black box
-        x = initial_custom_layers(data)  # Apply the first part of your custom model
-        
-        # Part 2: Train the black box model
-        optimizer_black_box.zero_grad()  # Zero gradients for the black box optimizer
-        black_box_input = x.detach()  # Prepare input for the black box, detaching to avoid affecting gradients of the initial part
-        black_box_output = net.black_box(black_box_input)  # Forward pass through the black box
-        loss = loss_function(black_box_output, target)  # Compute loss based on the black box's output and the true target
-        loss.backward()  # Compute gradients for the black box
-        optimizer_black_box.step()  # Update the black box model's parameters
-        
-        # Part 3: Continue with the rest of your custom model
-        optimizer_custom.zero_grad()  # Assuming a separate optimizer for custom layers if they are trainable with gradients
-        custom_model_output = subsequent_custom_layers(black_box_output)  # Process the output of the black box through the rest of your custom model
-        # Here, you'd continue with your custom training logic for the rest of the model
-        
-        # Optionally, compute and update based on loss between the final output and the target, if applicable
-'''
-
 
 def MNIST_loaders():
     transform = Compose([

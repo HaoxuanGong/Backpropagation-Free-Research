@@ -104,6 +104,39 @@ def create_negative_image(image_1: Tensor, image_2: Tensor):
 
     return torch.add(image_1, image_2)
 
+def create_negative_image_three(image_1: Tensor, image_2: Tensor, image_3: Tensor):
+    """
+    Create a negative image by combining three images with binary masks.
+
+    Parameters:
+    image_1 (Tensor): The first image to be combined.
+    image_2 (Tensor): The second image to be combined.
+    image_3 (Tensor): The third image to be combined.
+
+    Returns:
+    Tensor: The negative image created by combining the three input images.
+    """
+    assert image_1.shape == image_2.shape == image_3.shape, "Incompatible image shapes."
+
+    # Create the first mask for blending image_1 and image_2
+    mask1 = create_mask((image_1.shape[0], image_1.shape[1]))
+
+    # Blend image_1 and image_2
+    blended_12 = torch.mul(image_1, mask1) + torch.mul(image_2, 1 - mask1)
+
+    # Create the second mask for blending the result with image_3
+    # This time, ensure the mask allows parts of all three images to potentially be present
+    mask2 = create_mask((image_1.shape[0], image_1.shape[1]))
+    
+    # It's important that mask2 allows for areas from the first blend to show through, as well as new areas for image_3
+    # One approach could be to adjust mask2 to not overlap entirely with mask1 areas, but this can be complex and might need heuristic adjustments or specific design logic
+    
+    # For simplicity, directly blend the result with image_3; a more nuanced approach might be needed for better distribution
+    final_image = torch.mul(blended_12, mask2) + torch.mul(image_3, 1 - mask2)
+
+    return final_image
+
+
 
 def create_negative_batch(images: Tensor):
     neg_imgs = []
@@ -112,6 +145,8 @@ def create_negative_batch(images: Tensor):
         idx1, idx2 = np.random.randint(batch_size, size=2)
         neg_imgs.append(create_negative_image(images[idx1].squeeze(), images[idx2].squeeze()))
     return torch.unsqueeze(torch.stack(neg_imgs), dim=1)
+
+
 
 
 if __name__ == '__main__':
@@ -127,6 +162,7 @@ if __name__ == '__main__':
 
     mask = create_mask((28, 28))
     image = create_negative_image(image_1, image_2)
+    #image = create_negative_image_three(image_1,image_1,image_1)
 
     plt.figure()
 
