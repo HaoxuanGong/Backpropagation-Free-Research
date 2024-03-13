@@ -175,7 +175,7 @@ if __name__ == '__main__':
     transform = torchvision.transforms.Compose([
         torchvision.transforms.ToTensor()
     ])
-    pos_dataset = torchvision.datasets.MNIST(root='./', download=False, transform=transform, train=True)
+    pos_dataset = torchvision.datasets.MNIST(root='./', download=True, transform=transform, train=True)
     # pos_dataset = Subset(pos_dataset, list(range(1000)))
     # Create the data loader
     pos_dataloader = DataLoader(pos_dataset, batch_size=64, shuffle=True, num_workers=4)
