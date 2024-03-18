@@ -9,10 +9,11 @@ from torch.utils.data import DataLoader
 from PIL import Image
 import torchvision.transforms.functional as TF
 
+
 class Config:
     # Neural network architecture
     dims = [784, 500, 500]  # Adjust the dimensions here
-    
+
     # Training parameters
     learning_rate = 0.03  # Adjust the learning rate here
     threshold = 2.0  # Adjust the threshold here
@@ -20,17 +21,19 @@ class Config:
     train_batch_size = 50000  # Adjust the train batch size here
     test_batch_size = 10000  # Adjust the test batch size here
 
+
 class BlackBoxModel(nn.Module):
     def __init__(self):
         super(BlackBoxModel, self).__init__()
         self.layer1 = nn.Linear(500, 100)  # Adjust sizes as needed
         self.layer2 = nn.Linear(100, 500)  # Adjust sizes to match your architecture
         self.activation = nn.ReLU()
-    
+
     def forward(self, x):
         x = self.activation(self.layer1(x))
         x = self.activation(self.layer2(x))
         return x
+
 
 def MNIST_loaders():
     transform = Compose([
@@ -48,11 +51,13 @@ def MNIST_loaders():
 
     return train_loader, test_loader
 
+
 def overlay_y_on_x(x, y):
     x_ = x.clone()
     x_[:, :10] *= 0.0
     x_[range(x.shape[0]), y] = x.max()
     return x_
+
 
 class Net(torch.nn.Module):
     def __init__(self):
@@ -76,6 +81,7 @@ class Net(torch.nn.Module):
             print('training layer', i, '...')
             x_pos, x_neg = layer.train(x_pos, x_neg)
 
+
 class Layer(nn.Linear):
     def __init__(self, in_features, out_features):
         super().__init__(in_features, out_features, bias=True)
@@ -98,12 +104,14 @@ class Layer(nn.Linear):
             self.opt.step()
         return self.forward(x_pos).detach(), self.forward(x_neg).detach()
 
+
 def visualize_sample(data, name='', idx=0):
     reshaped = data[idx].cpu().reshape(28, 28)
     plt.figure(figsize=(4, 4))
     plt.title(name)
     plt.imshow(reshaped, cmap="gray")
     plt.show()
+
 
 def load_and_preprocess_image(image_path):
     # Load the image
@@ -126,10 +134,12 @@ def load_and_preprocess_image(image_path):
 
     return image
 
+
 def predict_single_image(image, model):
     # Predict the label for the image
     prediction = model.predict(image)
     return prediction.item()
+
 
 if __name__ == "__main__":
     torch.manual_seed(1234)
@@ -141,10 +151,10 @@ if __name__ == "__main__":
     x_pos = overlay_y_on_x(x, y)
     rnd = torch.randperm(x.size(0))
     x_neg = overlay_y_on_x(x, y[rnd])
-    
+
     for data, name in zip([x, x_pos, x_neg], ['orig', 'pos', 'neg']):
         visualize_sample(data, name)
-    
+
     net.train(x_pos, x_neg)
     print('train error:', 1.0 - net.predict(x).eq(y).float().mean().item())
 
