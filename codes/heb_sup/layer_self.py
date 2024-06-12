@@ -15,6 +15,7 @@ class Layer(nn.Linear):
         self.threshold = 2.0
         self.num_of_epochs = 500
         self.is_hinge_loss = is_hinge_loss
+        self.eta = 0.01  # Learning rate for Hebbian learning
 
     def forward(self, input: Tensor) -> Tensor:
         normalized_input = input / (input.norm(2, 1, keepdim=True) + 1e-4)
@@ -30,13 +31,30 @@ class Layer(nn.Linear):
         return torch.log(1 + torch.exp(torch.cat([
             -positive_goodness + self.threshold,
             negative_goodness - self.threshold]))).mean()
+    
+    def generate_weight_distribution(self, num_layers, tuning_parameter):
+        weights = []
+        total_weight = 0
+
+        for i in range(1, num_layers + 1):
+            weight = tuning_parameter * i
+            weights.append(weight)
+            total_weight += weight
+
+        # Normalize weights so they sum up to the number of layers
+        normalized_weights = [weight / total_weight * num_layers for weight in weights]
+
+        return normalized_weights
+
 
     def train_layer(self, positive_input, negative_input, layer_num):
+        weight = self.generate_weight_distribution(3, 0.8)
         for _ in tqdm(range(self.num_of_epochs)):
-            positive_goodness = self.forward(positive_input).pow(2).mean(1)
+            positive_goodness = self.forward(positive_input).pow(2).mean(1) 
             negative_goodness = self.forward(negative_input).pow(2).mean(1)
+
             if self.is_hinge_loss:
-                loss = self.hinge_loss(positive_goodness, negative_goodness)
+                loss = self.hinge_loss(positive_goodness, negative_goodness) * (weight[layer_num])
             else:
                 loss = self.soft_plus_loss(positive_goodness, negative_goodness)
 
