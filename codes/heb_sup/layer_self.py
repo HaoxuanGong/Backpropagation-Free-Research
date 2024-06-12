@@ -48,7 +48,8 @@ class Layer(nn.Linear):
 
 
     def train_layer(self, positive_input, negative_input, layer_num):
-        weight = self.generate_weight_distribution(3, 0.8)
+        #weight = self.generate_weight_distribution(2, 0.1)
+        weight = [0.8,1.1]
         for _ in tqdm(range(self.num_of_epochs)):
             positive_goodness = self.forward(positive_input).pow(2).mean(1) 
             negative_goodness = self.forward(negative_input).pow(2).mean(1)
