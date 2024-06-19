@@ -10,7 +10,7 @@ from network_self import Network
 def load_FashionMNIST_data(train_batch_size=50000, test_batch_size=10000):
     data_transformation = Compose([
         ToTensor(),
-        Normalize((0.2860,), (0.3530,)),
+        Normalize((0.0907,), (1.8081,)),
         Lambda(lambda x: torch.flatten(x))
     ])
 
