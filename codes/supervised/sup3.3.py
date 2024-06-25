@@ -185,10 +185,10 @@ if __name__ == "__main__":
 
     net.train(x_pos, x_neg)
 
-    print('train error:', 1.0 - net.predict(x).eq(y).float().mean().item())
+    print('training accuracy:', net.predict(x).eq(y).float().mean().item())
 
     # Evaluation
     x_te, y_te = next(iter(test_loader))
     x_te, y_te = x_te.cuda(), y_te.cuda()
 
-    print('test error:', 1.0 - net.predict(x_te).eq(y_te).float().mean().item())
+    print('testing accuracy:', net.predict(x_te).eq(y_te).float().mean().item())

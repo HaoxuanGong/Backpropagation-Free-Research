@@ -7,7 +7,6 @@ from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 
 from network_self import Network
 
-
 def load_MNIST_data(train_batch_size=50000, test_batch_size=10000):
     data_transformation = Compose([
         ToTensor(),
@@ -18,13 +17,13 @@ def load_MNIST_data(train_batch_size=50000, test_batch_size=10000):
     training_data_loader = DataLoader(
         MNIST('./data/', train=True, download=True, transform=data_transformation),
         batch_size=train_batch_size,
-        shuffle=True
+        shuffle=False
     )
 
     testing_data_loader = DataLoader(
         MNIST('./data/', train=False, download=True, transform=data_transformation),
         batch_size=test_batch_size,
-        shuffle=True
+        shuffle=False
     )
 
     return training_data_loader, testing_data_loader
@@ -40,7 +39,10 @@ def create_positive_data(data, label):
     return positive_data
 
 
-def create_negative_data(data, label):
+def create_negative_data(data, label, seed=None):
+    if seed is not None:
+        random.seed(seed)
+
     negative_data = data.clone()
     negative_data[:, :10] = 0.0
 
@@ -70,17 +72,18 @@ def prepare_data():
     positive_data = create_positive_data(training_data, training_data_label)
     print(f"Positive Data: ", positive_data)
 
-    negative_data = create_negative_data(training_data, training_data_label)
+    negative_data = create_negative_data(training_data, training_data_label, seed=1234)
     print(f"Negative Data: ", negative_data)
 
     return positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label
 
 
 if __name__ == "__main__":
+    torch.manual_seed(1234)
     positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label = prepare_data()
     network = Network([784, 500, 500]).cuda()
     network.train_network(positive_data, negative_data)
 
-    print("Training Error: ", 1.0 - network.predict(training_data).eq(training_data_label).float().mean().item())
+    print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
 
-    print("Testing Error: ", 1.0 - network.predict(testing_data).eq(testing_data_label).float().mean().item())
+    print("Testing Accuracy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
