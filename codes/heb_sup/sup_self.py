@@ -2,33 +2,55 @@ import random
 
 import torch
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST, FashionMNIST
+from torchvision.datasets import MNIST, CIFAR10, FashionMNIST
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 
 from network_self import Network
 
-def load_FashionMNIST_data(train_batch_size=50000, test_batch_size=10000):
+def load_CIFAR10_data(train_batch_size=256, test_batch_size=64):
     data_transformation = Compose([
         ToTensor(),
-        Normalize((0.0907,), (1.8081,)),
+        Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        Lambda(lambda x: torch.flatten(x))
+    ])
+
+    training_data_loader = DataLoader(
+        CIFAR10('./data/', train=True, download=True, transform=data_transformation),
+        batch_size=train_batch_size,
+        shuffle=False
+    )
+
+    testing_data_loader = DataLoader(
+        CIFAR10('./data/', train=False, download=True, transform=data_transformation),
+        batch_size=test_batch_size,
+        shuffle=False
+    )
+
+    return training_data_loader, testing_data_loader
+
+def load_FashionMNIST_data(train_batch_size=256, test_batch_size=64):
+    data_transformation = Compose([
+        ToTensor(),
+        Normalize((0.2860,), (0.3530,)),
         Lambda(lambda x: torch.flatten(x))
     ])
 
     training_data_loader = DataLoader(
         FashionMNIST('./data/', train=True, download=True, transform=data_transformation),
         batch_size=train_batch_size,
-        shuffle=True
+        shuffle=False
     )
 
     testing_data_loader = DataLoader(
         FashionMNIST('./data/', train=False, download=True, transform=data_transformation),
         batch_size=test_batch_size,
-        shuffle=True
+        shuffle=False
     )
 
     return training_data_loader, testing_data_loader
 
-def load_MNIST_data(train_batch_size=50000, test_batch_size=10000):
+
+def load_MNIST_data(train_batch_size=256, test_batch_size=64):
     data_transformation = Compose([
         ToTensor(),
         Normalize((0.1307,), (0.3081,)),
@@ -60,7 +82,10 @@ def create_positive_data(data, label):
     return positive_data
 
 
-def create_negative_data(data, label):
+def create_negative_data(data, label, seed=None):
+    if seed is not None:
+        random.seed(seed)
+
     negative_data = data.clone()
     negative_data[:, :10] = 0.0
 
@@ -77,9 +102,6 @@ def prepare_data():
     torch.manual_seed(1234)
     training_data_loader, testing_data_loader = load_MNIST_data()
 
-    # Call the load_FashionMNIST_data function instead of load_MNIST_data
-    #training_data_loader, testing_data_loader = load_FashionMNIST_data()
-
     training_data, training_data_label = next(iter(training_data_loader))
 
     testing_data, testing_data_label = next(iter(testing_data_loader))
@@ -93,17 +115,18 @@ def prepare_data():
     positive_data = create_positive_data(training_data, training_data_label)
     print(f"Positive Data: ", positive_data)
 
-    negative_data = create_negative_data(training_data, training_data_label)
+    negative_data = create_negative_data(training_data, training_data_label, seed=1234)
     print(f"Negative Data: ", negative_data)
 
     return positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label
 
 
 if __name__ == "__main__":
+    torch.manual_seed(1234)
     positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label = prepare_data()
     network = Network([784, 500, 500]).cuda()
     network.train_network(positive_data, negative_data)
 
-    print("Training Accuarcy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
+    print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
 
-    print("Testing Accuarcy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
+    print("Testing Accuracy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
