@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from torch.optim import Adam
 
-number_of_epochs = 200
+number_of_epochs = 250
 
 
 class Layer(nn.Linear):
@@ -16,9 +16,11 @@ class Layer(nn.Linear):
         self.activation = torch.nn.ReLU()
         self.learning_rate = 0.08
         self.optimizer = Adam(self.parameters(), lr=self.learning_rate)
+        self.layer_weights = nn.Parameter(torch.ones(2))
         self.threshold = 2.0
         self.num_of_epochs = number_of_epochs
         self.is_hinge_loss = is_hinge_loss
+        self.weight_optimizer = Adam([self.layer_weights], lr=self.learning_rate)  # Optimizer for layer_weights
 
     def forward(self, input: Tensor) -> Tensor:
         normalized_input = input / (input.norm(2, 1, keepdim=True) + 1e-4)
@@ -36,7 +38,7 @@ class Layer(nn.Linear):
 
     def soft_plus_loss(self, positive_goodness, negative_goodness, is_second_phase=False):
         if is_second_phase:
-            threshold = self.threshold * 2
+            threshold = self.threshold * 3
         else:
             threshold = self.threshold
         return torch.log(1 + torch.exp(torch.cat([
@@ -57,16 +59,19 @@ class Layer(nn.Linear):
 
     def train_layer(self, positive_input, negative_input, layer_num):
         for _ in tqdm(range(self.num_of_epochs)):
-            positive_goodness = self.forward(positive_input).pow(2).mean(1)
-            negative_goodness = self.forward(negative_input).pow(2).mean(1)
+            positive_goodness = self.forward(positive_input).pow(2).mean(1) * self.layer_weights[layer_num]
+            negative_goodness = self.forward(negative_input).pow(2).mean(1) * self.layer_weights[layer_num]
             if self.is_hinge_loss:
                 loss = self.hinge_loss(positive_goodness, negative_goodness)
             else:
                 loss = self.soft_plus_loss(positive_goodness, negative_goodness)
 
             self.optimizer.zero_grad()
+            self.weight_optimizer.zero_grad()  # Clear gradients for layer_weights
             loss.backward()
             self.optimizer.step()
+            self.weight_optimizer.step()  # Update layer_weights
 
+        print(self.layer_weights)
         return self.forward(positive_input).detach(), self.forward(negative_input).detach()
 

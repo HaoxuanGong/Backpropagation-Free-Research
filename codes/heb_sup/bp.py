@@ -73,7 +73,7 @@ def load_MNIST_data(train_batch_size=256, test_batch_size=64):
     return training_data_loader, testing_data_loader
 
 class SimpleNN(nn.Module):
-    def __init__(self, layer_sizes, bias=True, device=None, d_type=None, is_hinge_loss=True):
+    def __init__(self, layer_sizes, bias=True, device=None, d_type=None):
         super().__init__()
         self.layers = nn.ModuleList()
         for i in range(len(layer_sizes) - 1):
