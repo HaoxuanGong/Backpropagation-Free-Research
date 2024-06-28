@@ -2,12 +2,34 @@ import random
 
 import torch
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST, FashionMNIST
+from torchvision.datasets import MNIST, FashionMNIST, CIFAR10
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 
 from network_self import Network
 
-def load_FashionMNIST_data(train_batch_size=256, test_batch_size=64):
+
+def load_CIFAR10_data(train_batch_size=50000, test_batch_size=10000):
+    data_transformation = Compose([
+        ToTensor(),
+        Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        Lambda(lambda x: torch.flatten(x))
+    ])
+
+    training_data_loader = DataLoader(
+        CIFAR10('./data/', train=True, download=True, transform=data_transformation),
+        batch_size=train_batch_size,
+        shuffle=False
+    )
+
+    testing_data_loader = DataLoader(
+        CIFAR10('./data/', train=False, download=True, transform=data_transformation),
+        batch_size=test_batch_size,
+        shuffle=False
+    )
+
+    return training_data_loader, testing_data_loader
+
+def load_FashionMNIST_data(train_batch_size=50000, test_batch_size=10000):
     data_transformation = Compose([
         ToTensor(),
         Normalize((0.2860,), (0.3530,)),
@@ -78,7 +100,7 @@ def create_negative_data(data, label, seed=None):
 
 def prepare_data():
     torch.manual_seed(1234)
-    training_data_loader, testing_data_loader = load_MNIST_data()
+    training_data_loader, testing_data_loader = load_CIFAR10_data()
 
     training_data, training_data_label = next(iter(training_data_loader))
 
@@ -102,7 +124,7 @@ def prepare_data():
 if __name__ == "__main__":
     torch.manual_seed(1234)
     positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label = prepare_data()
-    network = Network([784, 500, 500]).cuda()
+    network = Network([3072, 500, 500]).cuda()
     network.train_network(positive_data, negative_data)
 
     print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
