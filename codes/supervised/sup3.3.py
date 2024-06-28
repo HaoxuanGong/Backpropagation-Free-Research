@@ -169,7 +169,7 @@ if __name__ == "__main__":
     torch.manual_seed(1234)
     train_loader, test_loader = MNIST_loaders()
 
-    net = Net([784, 500, 500])
+    net = Net([784, 500, 500, 500, 500])
     # gets the first batch of images (x) and their labels (y) from the training data loader
     x, y = next(iter(train_loader))
     # moves the images and labels to GPU to enable faster computation

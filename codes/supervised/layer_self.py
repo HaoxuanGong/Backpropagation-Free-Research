@@ -42,6 +42,16 @@ class Layer(nn.Linear):
             -positive_goodness + threshold,
             negative_goodness - threshold]))).mean()
 
+    def exponential_negative_hinge_loss(self, negative_goodness, threshold=4, delta=1.0):
+        # Negative loss
+        loss = torch.exp(5 * torch.clamp(delta - (threshold - negative_goodness), min=0)) - 1
+        return loss.mean()
+
+    def exponential_positive_hinge_loss(self, positive_goodness, threshold=4, delta=1.0):
+        # Positive loss
+        loss = torch.exp(5 * torch.clamp(delta - (positive_goodness - threshold), min=0)) - 1
+        return loss.mean()
+
     def train_layer(self, positive_input, negative_input, layer_num):
         for _ in tqdm(range(self.num_of_epochs)):
             positive_goodness = self.forward(positive_input).pow(2).mean(1)
@@ -70,4 +80,3 @@ class Layer(nn.Linear):
     #         negative_sum = first_layer_positive_goodness_sum * layer_weights[0] + second_layer_negative_goodness_sum * layer_weights[1]
     #
     #         loss = self.hinge_loss(positive_sum, negative_sum, is_second_phase=True)
-
