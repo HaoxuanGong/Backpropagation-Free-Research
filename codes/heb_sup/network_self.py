@@ -28,10 +28,11 @@ class Network(nn.Module):
             goodness = []
             for layer_num, layer in enumerate(self.layers):
                 marked_data = layer(marked_data)
-                goodness_value = marked_data.pow(2).mean(1) #* self.layer_weights[layer_num].item()
+                layer_weights = layer.layer_weights[layer_num, :]
+                goodness_value = (marked_data.pow(2) * layer_weights).mean(1)
                 # goodness_value = marked_data.pow(2).mean(1)
                 goodness.append(goodness_value)
-            goodness_per_label.append(sum(goodness).unsqueeze(1))
+            goodness_per_label.append(torch.sum(torch.stack(goodness), dim=0).unsqueeze(1))
         goodness_per_label = torch.cat(goodness_per_label, 1)
         return goodness_per_label.argmax(dim=1)
 

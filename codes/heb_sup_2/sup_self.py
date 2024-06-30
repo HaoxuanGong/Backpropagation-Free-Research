@@ -7,7 +7,7 @@ from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 
 from network_self import Network
 
-def load_FashionMNIST_data(train_batch_size=256, test_batch_size=64):
+def load_FashionMNIST_data(train_batch_size=60000, test_batch_size=10000):
     data_transformation = Compose([
         ToTensor(),
         Normalize((0.2860,), (0.3530,)),
@@ -78,7 +78,7 @@ def create_negative_data(data, label, seed=None):
 
 def prepare_data():
     torch.manual_seed(1234)
-    training_data_loader, testing_data_loader = load_MNIST_data()
+    training_data_loader, testing_data_loader = load_FashionMNIST_data()
 
     training_data, training_data_label = next(iter(training_data_loader))
 

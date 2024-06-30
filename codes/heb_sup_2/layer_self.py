@@ -16,11 +16,11 @@ class Layer(nn.Linear):
         self.activation = torch.nn.ReLU()
         self.learning_rate = 0.08
         self.optimizer = Adam(self.parameters(), lr=self.learning_rate)
-        self.layer_weights = nn.Parameter(torch.ones(2))
+        self.layer_weights = nn.Parameter(torch.ones(2, 500))
         self.threshold = 2.0
         self.num_of_epochs = number_of_epochs
         self.is_hinge_loss = is_hinge_loss
-        self.weight_optimizer = Adam([self.layer_weights], lr=0.06)  # Optimizer for layer_weights
+        self.weight_optimizer = Adam([self.layer_weights], lr=0.12)  # Optimizer for layer_weights
 
     def forward(self, input: Tensor) -> Tensor:
         normalized_input = input / (input.norm(2, 1, keepdim=True) + 1e-4)
@@ -59,10 +59,12 @@ class Layer(nn.Linear):
 
     def train_layer(self, positive_input, negative_input, layer_num):
         for _ in tqdm(range(self.num_of_epochs)):
-            positive_goodness = self.forward(positive_input).pow(2).mean(1) * self.layer_weights[layer_num]
-            negative_goodness = self.forward(negative_input).pow(2).mean(1) * self.layer_weights[layer_num]
-            print(self.forward(positive_input).pow(2))
-            print(self.forward(positive_input).pow(2).mean(1))
+            positive_output = self.forward(positive_input)  # Shape: [batch_size, 500]
+            negative_output = self.forward(negative_input)
+            layer_weight_row = self.layer_weights[layer_num, :]
+
+            positive_goodness = (positive_output.pow(2) * layer_weight_row).mean(1)  # Shape: [batch_size]
+            negative_goodness = (negative_output.pow(2) * layer_weight_row).mean(1)
             if self.is_hinge_loss:
                 loss = self.hinge_loss(positive_goodness, negative_goodness)
             else:
