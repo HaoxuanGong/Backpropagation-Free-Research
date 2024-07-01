@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.optim import Adam
 
-number_of_epochs = 200
+number_of_epochs = 600
 
 
 class Layer(nn.Linear):
@@ -14,9 +14,9 @@ class Layer(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, device=None, d_type=None, is_hinge_loss=False):
         super().__init__(in_features, out_features, bias, device, d_type)
         self.activation = torch.nn.ReLU()
-        self.learning_rate = 0.05
+        self.learning_rate = 0.06
         self.optimizer = Adam(self.parameters(), lr=self.learning_rate)
-        self.layer_weights = nn.Parameter(torch.ones(2, 500))
+        self.layer_weights = nn.Parameter(torch.ones(6, 900))
         self.threshold = 2.0
         self.num_of_epochs = number_of_epochs
         self.is_hinge_loss = is_hinge_loss
@@ -29,11 +29,20 @@ class Layer(nn.Linear):
 
     def hinge_loss(self, positive_goodness, negative_goodness, delta=1.0, is_second_phase=False):
         if is_second_phase:
-            threshold = self.threshold 
+            threshold = self.threshold * 2
         else:
             threshold = self.threshold
         positive_loss = torch.clamp(delta - (positive_goodness - threshold), min=0)
         negative_loss = torch.clamp(delta - (threshold - negative_goodness), min=0)
+        return torch.cat([positive_loss, negative_loss]).mean()
+
+    def exponential_hinge_loss(self, positive_goodness, negative_goodness, delta=1.0, is_second_phase=False):
+        if is_second_phase:
+            threshold = self.threshold * 2
+        else:
+            threshold = self.threshold
+        positive_loss = torch.exp(torch.clamp(delta - (positive_goodness - threshold), min=0)) - 1
+        negative_loss = torch.exp(torch.clamp(delta - (threshold - negative_goodness), min=0)) - 1
         return torch.cat([positive_loss, negative_loss]).mean()
 
     def soft_plus_loss(self, positive_goodness, negative_goodness, is_second_phase=False):
@@ -44,14 +53,14 @@ class Layer(nn.Linear):
         return torch.log(1 + torch.exp(torch.cat([
             -positive_goodness + threshold,
             negative_goodness - threshold]))).mean()
-    
+
     def contrastive_loss(self, positive_goodness, negative_goodness, margin=1.0):
         # Contrastive loss: positive_goodness should be higher, negative_goodness should be lower
         positive_loss = (positive_goodness - 1).pow(2)  # We want positive_goodness close to 1
         negative_loss = torch.clamp(margin - negative_goodness, min=0).pow(2)  # We want negative_goodness far from 1
         loss = (positive_loss + negative_loss).mean()
         return loss
-    
+
     def margin_ranking_loss(self, positive_scores, negative_scores):
         squared_diff = (positive_scores - negative_scores).pow(2)
         loss = squared_diff.mean()
@@ -81,6 +90,7 @@ class Layer(nn.Linear):
 
         plt.tight_layout()
         plt.show()
+
     def train_layer(self, positive_input, negative_input, layer_num):
         positive_goodness_history = []
         negative_goodness_history = []
@@ -102,7 +112,7 @@ class Layer(nn.Linear):
             positive_unaltered_goodness_history.append(positive_unaltered_goodness.mean().item())
             negative_unaltered_goodness_history.append(negative_unaltered_goodness.mean().item())
             if self.is_hinge_loss:
-                loss = self.hinge_loss(positive_goodness, negative_goodness)
+                loss = self.exponential_hinge_loss(positive_goodness, negative_goodness)
             else:
                 loss = self.soft_plus_loss(positive_goodness, negative_goodness)
 
@@ -116,4 +126,3 @@ class Layer(nn.Linear):
         self.plot_goodness(positive_goodness_history, negative_goodness_history,
                            positive_unaltered_goodness_history, negative_unaltered_goodness_history)
         return self.forward(positive_input).detach(), self.forward(negative_input).detach()
-
