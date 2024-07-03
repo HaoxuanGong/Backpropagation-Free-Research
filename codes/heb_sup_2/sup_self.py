@@ -14,18 +14,6 @@ def measure_memory_usage():
     memory_usage_mb = memory_usage_bytes / (1024 * 1024)  # Convert to MB
     return memory_usage_mb
 
-def measure_time(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        execution_time = end_time - start_time
-        return result, execution_time
-    return wrapper
-
-def train_network_and_measure_time(network, positive_data, negative_data):
-    return network.train_network(positive_data, negative_data)
-
 
 def load_KMNIST_data(train_batch_size=60000, test_batch_size=10000):
     data_transformation = Compose([
@@ -144,23 +132,18 @@ if __name__ == "__main__":
     torch.manual_seed(1234)
     positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label = prepare_data()
 
-    # Measure memory usage and time before training
+    # Measure memory usage before training
     memory_before = measure_memory_usage()
     print(f"Memory Usage before training: {memory_before:.2f} MB")
 
-    # Train the network and measure time
+    # Train the network
     network = Network([784, 500, 500]).cuda()
-    trained_network, execution_time = train_network_and_measure_time(network, positive_data, negative_data)
-    print(f"Training Execution Time: {execution_time:.2f} seconds")
+    network.train_network(positive_data, negative_data)
 
     # Measure memory usage after training
     memory_after = measure_memory_usage()
     print(f"Memory Usage after training: {memory_after:.2f} MB")
 
-    # Optionally, print memory difference
+    # Optionally, print difference
     memory_diff = memory_after - memory_before
     print(f"Memory increase during training: {memory_diff:.2f} MB")
-
-    # Evaluate accuracy
-    print("Training Accuracy: ", trained_network.predict(training_data).eq(training_data_label).float().mean().item())
-    print("Testing Accuracy: ", trained_network.predict(testing_data).eq(testing_data_label).float().mean().item())
