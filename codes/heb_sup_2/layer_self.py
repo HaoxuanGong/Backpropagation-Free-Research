@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from torch.optim import Adam
 
-number_of_epochs = 200
+number_of_epochs = 60
 
 
 class Layer(nn.Linear):
@@ -14,7 +14,7 @@ class Layer(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, device=None, d_type=None, is_hinge_loss=False):
         super().__init__(in_features, out_features, bias, device, d_type)
         self.activation = torch.nn.ReLU()
-        self.learning_rate = 0.08
+        self.learning_rate = 0.08 
         self.optimizer = Adam(self.parameters(), lr=self.learning_rate)
         self.layer_weights = nn.Parameter(torch.ones(2, 500))
         self.threshold = 2.0

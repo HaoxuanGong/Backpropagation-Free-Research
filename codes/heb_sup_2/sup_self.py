@@ -1,11 +1,52 @@
-import random
-
+import psutil
+import os
 import torch
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST, FashionMNIST
+from torchvision.datasets import KMNIST
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
-
 from network_self import Network
+import random
+import time
+
+def measure_memory_usage():
+    process = psutil.Process(os.getpid())
+    memory_usage_bytes = process.memory_info().rss
+    memory_usage_mb = memory_usage_bytes / (1024 * 1024)  # Convert to MB
+    return memory_usage_mb
+
+def measure_time(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        return result, execution_time
+    return wrapper
+
+def train_network_and_measure_time(network, positive_data, negative_data):
+    return network.train_network(positive_data, negative_data)
+
+
+def load_KMNIST_data(train_batch_size=60000, test_batch_size=10000):
+    data_transformation = Compose([
+        ToTensor(),
+         Normalize((0.1307,), (0.3081,)),
+        Lambda(lambda x: torch.flatten(x))
+    ])
+
+    training_data_loader = DataLoader(
+        KMNIST('./data/', train=True, download=True, transform=data_transformation),
+        batch_size=train_batch_size,
+        shuffle=False
+    )
+
+    testing_data_loader = DataLoader(
+        KMNIST('./data/', train=False, download=True, transform=data_transformation),
+        batch_size=test_batch_size,
+        shuffle=False
+    )
+
+    return training_data_loader, testing_data_loader
 
 def load_FashionMNIST_data(train_batch_size=60000, test_batch_size=10000):
     data_transformation = Compose([
@@ -78,7 +119,7 @@ def create_negative_data(data, label, seed=None):
 
 def prepare_data():
     torch.manual_seed(1234)
-    training_data_loader, testing_data_loader = load_FashionMNIST_data()
+    training_data_loader, testing_data_loader = load_KMNIST_data()
 
     training_data, training_data_label = next(iter(training_data_loader))
 
@@ -102,9 +143,24 @@ def prepare_data():
 if __name__ == "__main__":
     torch.manual_seed(1234)
     positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label = prepare_data()
+
+    # Measure memory usage and time before training
+    memory_before = measure_memory_usage()
+    print(f"Memory Usage before training: {memory_before:.2f} MB")
+
+    # Train the network and measure time
     network = Network([784, 500, 500]).cuda()
-    network.train_network(positive_data, negative_data)
+    trained_network, execution_time = train_network_and_measure_time(network, positive_data, negative_data)
+    print(f"Training Execution Time: {execution_time:.2f} seconds")
 
-    print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
+    # Measure memory usage after training
+    memory_after = measure_memory_usage()
+    print(f"Memory Usage after training: {memory_after:.2f} MB")
 
-    print("Testing Accuracy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
+    # Optionally, print memory difference
+    memory_diff = memory_after - memory_before
+    print(f"Memory increase during training: {memory_diff:.2f} MB")
+
+    # Evaluate accuracy
+    print("Training Accuracy: ", trained_network.predict(training_data).eq(training_data_label).float().mean().item())
+    print("Testing Accuracy: ", trained_network.predict(testing_data).eq(testing_data_label).float().mean().item())
