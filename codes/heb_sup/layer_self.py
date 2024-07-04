@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.optim import Adam
 
-number_of_epochs = 600
+number_of_epochs = 200
 
 
 class Layer(nn.Linear):
@@ -16,11 +16,11 @@ class Layer(nn.Linear):
         self.activation = torch.nn.ReLU()
         self.learning_rate = 0.06
         self.optimizer = Adam(self.parameters(), lr=self.learning_rate)
-        self.layer_weights = nn.Parameter(torch.ones(6, 900))
+        self.layer_weights = nn.Parameter(torch.ones(2, 500))
         self.threshold = 2.0
         self.num_of_epochs = number_of_epochs
         self.is_hinge_loss = is_hinge_loss
-        self.weight_optimizer = Adam([self.layer_weights], lr=0.0)  # Optimizer for layer_weights
+        self.weight_optimizer = Adam([self.layer_weights], lr=0.15)  # Optimizer for layer_weights
 
     def forward(self, input: Tensor) -> Tensor:
         normalized_input = input / (input.norm(2, 1, keepdim=True) + 1e-4)

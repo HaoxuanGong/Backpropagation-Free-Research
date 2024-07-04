@@ -100,7 +100,7 @@ def create_negative_data(data, label, seed=None):
 
 def prepare_data():
     torch.manual_seed(1234)
-    training_data_loader, testing_data_loader = load_CIFAR10_data()
+    training_data_loader, testing_data_loader = load_FashionMNIST_data()
 
     training_data, training_data_label = next(iter(training_data_loader))
 
@@ -124,7 +124,7 @@ def prepare_data():
 if __name__ == "__main__":
     torch.manual_seed(1234)
     positive_data, negative_data, training_data, training_data_label, testing_data, testing_data_label = prepare_data()
-    network = Network([3072, 900, 900, 900, 900, 900, 900]).cuda() #3072
+    network = Network([784, 500, 500]).cuda() #3072
     network.train_network(positive_data, negative_data)
 
     print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
