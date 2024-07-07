@@ -90,10 +90,11 @@ class Layer(nn.Linear):
                 loss = self.soft_plus_loss(positive_goodness, negative_goodness)
 
             self.optimizer.zero_grad()
-            self.nasf_optimizer.zero_grad()  # Clear gradients for layer_weights
-            loss.backward()
+            self.nasf_optimizer.zero_grad()
+            # backward to compute the derivative only and hence is not considered backpropagation.
+            loss.backward() 
             self.optimizer.step()
-            self.nasf_optimizer.step()  # Update layer_weights
+            self.nasf_optimizer.step()
 
         print(self.nasf)
         #self.plot_goodness(positive_goodness_history, negative_goodness_history,positive_unaltered_goodness_history, negative_unaltered_goodness_history)
