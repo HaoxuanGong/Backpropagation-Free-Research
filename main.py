@@ -20,7 +20,7 @@ def load_CIFAR10_data(train_batch_size=50000, test_batch_size=10000):
     training_data_loader = DataLoader(
         CIFAR10('./data/', train=True, download=True, transform=data_transformation),
         batch_size=train_batch_size,
-        shuffle=False
+        shuffle=True
     )
 
     testing_data_loader = DataLoader(
@@ -41,7 +41,7 @@ def load_KMNIST_data(train_batch_size=50000, test_batch_size=10000):
     training_data_loader = DataLoader(
         KMNIST('./data/', train=True, download=True, transform=data_transformation),
         batch_size=train_batch_size,
-        shuffle=False
+        shuffle=True
     )
 
     testing_data_loader = DataLoader(
@@ -62,7 +62,7 @@ def load_FashionMNIST_data(train_batch_size=50000, test_batch_size=10000):
     training_data_loader = DataLoader(
         FashionMNIST('./data/', train=True, download=True, transform=data_transformation),
         batch_size=train_batch_size,
-        shuffle=False
+        shuffle=True
     )
 
     testing_data_loader = DataLoader(

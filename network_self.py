@@ -25,7 +25,7 @@ class Network(nn.Module):
             goodness = []
             for layer_num, layer in enumerate(self.layers):
                 marked_data = layer(marked_data)
-                layer_weights = layer.layer_weights[layer_num, :]
+                layer_weights = layer.nasf[layer_num, :]
                 goodness_value = (marked_data.pow(2) * layer_weights).mean(1)
                 goodness.append(goodness_value)
             goodness_per_label.append(torch.sum(torch.stack(goodness), dim=0).unsqueeze(1))

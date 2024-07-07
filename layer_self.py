@@ -11,14 +11,14 @@ class Layer(nn.Linear):
         super().__init__(in_features, out_features, bias, device, d_type)
         # adjust hyperparameters here
         self.activation = torch.nn.ReLU()
-        self.learning_rate = 0.07
-        self.fwlearning_rate = 0.0
+        self.learning_rate = 0.07 # network optimzer lr
+        self.nasf_learning_rate = 0.1 # neuron activity scaling factors optimzer lr
         self.optimizer = Adam(self.parameters(), lr=self.learning_rate)
-        self.layer_weights = nn.Parameter(torch.ones(2, 50))
+        self.nasf = nn.Parameter(torch.ones(2, 50)) # neuron activity scaling factors
+        self.nasf_optimizer = Adam([self.nasf], lr=self.nasf_learning_rate)  # Optimizer for layer_weights
         self.threshold = 2.0
         self.num_of_epochs = 200
         self.is_hinge_loss = is_hinge_loss
-        self.weight_optimizer = Adam([self.layer_weights], lr=self.fwlearning_rate)  # Optimizer for layer_weights
 
     def forward(self, input: Tensor) -> Tensor:
         normalized_input = input / (input.norm(2, 1, keepdim=True) + 1e-4)
@@ -72,7 +72,7 @@ class Layer(nn.Linear):
         for _ in tqdm(range(self.num_of_epochs)):
             positive_output = self.forward(positive_input)  # Shape: [batch_size, 500]
             negative_output = self.forward(negative_input)
-            layer_weight_row = self.layer_weights[layer_num, :]
+            layer_weight_row = self.nasf[layer_num, :]
 
             positive_goodness = (positive_output.pow(2) * layer_weight_row).mean(1)  # Shape: [batch_size]
             negative_goodness = (negative_output.pow(2) * layer_weight_row).mean(1)
@@ -90,11 +90,11 @@ class Layer(nn.Linear):
                 loss = self.soft_plus_loss(positive_goodness, negative_goodness)
 
             self.optimizer.zero_grad()
-            self.weight_optimizer.zero_grad()  # Clear gradients for layer_weights
+            self.nasf_optimizer.zero_grad()  # Clear gradients for layer_weights
             loss.backward()
             self.optimizer.step()
-            self.weight_optimizer.step()  # Update layer_weights
+            self.nasf_optimizer.step()  # Update layer_weights
 
-        print(self.layer_weights)
+        print(self.nasf)
         #self.plot_goodness(positive_goodness_history, negative_goodness_history,positive_unaltered_goodness_history, negative_unaltered_goodness_history)
         return self.forward(positive_input).detach(), self.forward(negative_input).detach()
