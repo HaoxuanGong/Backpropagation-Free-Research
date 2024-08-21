@@ -79,8 +79,8 @@ class SimpleNN(nn.Module):
         for i in range(len(layer_sizes) - 1):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1], bias=bias).to(device=device, dtype=d_type))
         self.activation = torch.nn.ReLU()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.num_of_epochs = 2
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.01)
+        self.num_of_epochs = 1200
         self.criterion = nn.CrossEntropyLoss()
 
     def forward(self, x):
@@ -119,10 +119,10 @@ class SimpleNN(nn.Module):
 
 
 # Load MNIST data
-train_loader, test_loader = load_MNIST_data()
+train_loader, test_loader = load_CIFAR10_data()
 
 # Define the model
-model = SimpleNN([784, 500, 500])
+model = SimpleNN([3072, 800, 800, 800])
 model.train(train_loader)
 
 # Evaluate the model
