@@ -34,7 +34,7 @@ class Layer(nn.Linear):
         self.in_channels = 1  # Assuming grayscale images, hence 1 channel
         self.image_size = int(in_features ** 0.5)  # Assuming input is flattened image
         self.block_size = 10
-        self.neighborhood_size = 25
+        self.neighborhood_size = 400
          # Create a block-wise connectivity mask
         #self.mask = self.create_block_wise_mask(in_features, out_features, self.block_size).cuda()
         self.mask = self.create_neighbour_mask(in_features, out_features).cuda()
@@ -54,6 +54,8 @@ class Layer(nn.Linear):
         # W[i, j] is the connection(weight) between:        
         # j-th neuron in the input layer   
         # The i-th neuron in the output layer   
+        # this is block wise connection, so 0-9 in input connect to 0-9 in output
+        # 10-19 input to 10-19 output
         mask = torch.zeros(out_features, in_features)
         for i in range(0, in_features, block_size):
             start_index = i
@@ -62,6 +64,7 @@ class Layer(nn.Linear):
         return mask
     
     def create_neighbour_mask(self, in_features, out_features):
+        # neighbour connection, so 0 connects to 0-10, 1 connect to 1-11
         mask = torch.zeros(out_features, in_features)
         for i in range(out_features):
             # start and end indices for the neighborhood
