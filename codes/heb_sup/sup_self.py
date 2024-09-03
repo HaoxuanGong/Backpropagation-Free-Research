@@ -100,7 +100,7 @@ def create_negative_data(data, label, seed=None):
 
 def prepare_data():
     torch.manual_seed(1234)
-    training_data_loader, testing_data_loader = load_FashionMNIST_data()
+    training_data_loader, testing_data_loader = load_MNIST_data()
 
     training_data, training_data_label = next(iter(training_data_loader))
 
