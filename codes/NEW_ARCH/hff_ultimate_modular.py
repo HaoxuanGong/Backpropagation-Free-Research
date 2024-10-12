@@ -1,12 +1,13 @@
 import random
 import torch
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
+from torchvision.datasets import MNIST, CIFAR100
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 from tqdm import tqdm
 import torch.nn as nn
 from torch.optim import Adam
 import time
+import numpy as np
 
 # Define the number of classes and epochs globally
 num_classes = 10
@@ -54,33 +55,36 @@ class HFF(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList([HLayer(layers_config[i], layers_config[i+1]).cuda() for i in range(len(layers_config) - 1)])
 
-    def create_data(self, data, label, seed=None):
+    def create_neg_data(self, data, label, seed=None):
         if seed is not None:
             random.seed(seed)
-
-        positive_data = data.clone()
-        positive_data[:, :num_classes] = 0.0
-        for i in range(positive_data.shape[0]):
-            positive_data[i][label[i]] = positive_data.max()
             
-
         negative_data = data.clone()
-        negative_data[:, :num_classes] = 0.0
+        #negative_data[:, :num_classes] = 0.0
         for i in range(negative_data.shape[0]):
             possible_answers = list(range(num_classes))
             possible_answers.remove(label[i])
             false_label = random.choice(possible_answers)
             negative_data[i][false_label] = negative_data.max()
+        return negative_data
+    
+    def create_pos_data(self, data, label, seed=None):
+        if seed is not None:
+            random.seed(seed)
 
-        return positive_data , negative_data
+        positive_data = data.clone()
+        #positive_data[:, :num_classes] = 0.0
+        for i in range(positive_data.shape[0]):
+            positive_data[i][label[i]] = positive_data.max()
+        return positive_data
 
     def train_network(self, training_data, training_data_label):
-        for epoch in range(3):
+        for epoch in range(2):
             print(f'Epoch {epoch + 1}')
-            goodness_pos, goodness_neg = self.create_data(training_data, training_data_label) #  postivtve and negative generation
+            goodness_pos = self.create_pos_data(training_data, training_data_label) #  postivtve and negative generation
+            goodness_neg = self.create_neg_data(training_data, training_data_label) #  postivtve and negative generation
             positive_labels = nn.Parameter(goodness_pos[:, :num_classes].cuda())
             negative_labels = nn.Parameter(goodness_neg[:, :num_classes].cuda())
-
             for i, layer in enumerate(self.layers):
                 print(f'Training Layer {i}...')
                 goodness_pos, goodness_neg = layer.train_layer(goodness_pos, goodness_neg, positive_labels, negative_labels)
@@ -153,7 +157,7 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     torch.manual_seed(1234)
     training_data, training_data_label, testing_data, testing_data_label = prepare_data()
-    network = HFF([784, 50, 50]).cuda()  # Use num_classes
+    network = HFF([784, 500, 500]).cuda()  # Use num_classes
     network.train_network(training_data, training_data_label) # this now only take in traing data and label, postive and neg is generated within network
     print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
     print("Testing Accuracy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
