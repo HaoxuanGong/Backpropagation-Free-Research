@@ -10,7 +10,7 @@ import time
 
 # Define the number of classes and epochs globally
 num_classes = 10
-epochs = 50
+epochs = 300
 
 class HLayer(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, device=None, dtype=None):
@@ -61,7 +61,8 @@ class HFF(nn.Module):
         positive_data = data.clone()
         positive_data[:, :num_classes] = 0.0
         for i in range(positive_data.shape[0]):
-            positive_data[i][label[i]] = 1.0
+            positive_data[i][label[i]] = positive_data.max()
+            
 
         negative_data = data.clone()
         negative_data[:, :num_classes] = 0.0
@@ -69,12 +70,12 @@ class HFF(nn.Module):
             possible_answers = list(range(num_classes))
             possible_answers.remove(label[i])
             false_label = random.choice(possible_answers)
-            negative_data[i][false_label] = 1.0
+            negative_data[i][false_label] = negative_data.max()
 
         return positive_data , negative_data
 
     def train_network(self, training_data, training_data_label):
-        for epoch in range(1):
+        for epoch in range(3):
             print(f'Epoch {epoch + 1}')
             goodness_pos, goodness_neg = self.create_data(training_data, training_data_label) #  postivtve and negative generation
             positive_labels = nn.Parameter(goodness_pos[:, :num_classes].cuda())
@@ -118,7 +119,7 @@ class HFF(nn.Module):
 
 
 # Data loading function for MNIST
-def load_MNIST_data(train_batch_size=50000, test_batch_size=10000):
+def load_MNIST_data(train_batch_size=5000, test_batch_size=1000):
     data_transformation = Compose([
         ToTensor(),
         Normalize((0.1307,), (0.3081,)),
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     torch.manual_seed(1234)
     training_data, training_data_label, testing_data, testing_data_label = prepare_data()
-    network = HFF([784, 1000, 1000]).cuda()  # Use num_classes
+    network = HFF([784, 50, 50]).cuda()  # Use num_classes
     network.train_network(training_data, training_data_label) # this now only take in traing data and label, postive and neg is generated within network
     print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
     print("Testing Accuracy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
