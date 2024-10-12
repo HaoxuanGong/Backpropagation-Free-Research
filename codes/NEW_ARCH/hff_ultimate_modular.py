@@ -14,7 +14,7 @@ epochs = 400
 class HebbianLayer(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, device=None, dtype=None):
         super().__init__(in_features, out_features, bias, device, dtype)
-        self.hebbian_weights = nn.Parameter(torch.ones(num_classes, out_features).cuda())  # num_classes dynamic
+        self.hebbian_weights = nn.Parameter(torch.ones(num_classes, out_features).cuda())  # num_classes x number of nuerons
         self.activation = nn.ReLU()
         self.optimizer = Adam(self.parameters(), lr=0.01)
         self.hebbian_optimizer = Adam([self.hebbian_weights], lr=0.01)
@@ -75,7 +75,7 @@ class HebbianNetwork(nn.Module):
     def train_network(self, training_data, training_data_label):
         for epoch in range(2):
             print(f'Epoch {epoch + 1}')
-            goodness_pos, goodness_neg = self.create_data(training_data, training_data_label) # only with postivtve
+            goodness_pos, goodness_neg = self.create_data(training_data, training_data_label) #  postivtve and negative generation
             positive_labels = nn.Parameter(goodness_pos[:, :num_classes].cuda())
             negative_labels = nn.Parameter(goodness_neg[:, :num_classes].cuda())
 
@@ -140,6 +140,6 @@ if __name__ == "__main__":
     torch.manual_seed(1234)
     training_data, training_data_label, testing_data, testing_data_label = prepare_data()
     network = HebbianNetwork([784, 500, 123 , 321]).cuda()  # Use num_classes
-    network.train_network(training_data, training_data_label)
+    network.train_network(training_data, training_data_label) # this now only take in traing data and label, postive and neg is generated within network
     print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
     print("Testing Accuracy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
