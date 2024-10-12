@@ -6,12 +6,13 @@ from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 from tqdm import tqdm
 import torch.nn as nn
 from torch.optim import Adam
+import time
 
 # Define the number of classes and epochs globally
 num_classes = 10
-epochs = 400
+epochs = 50
 
-class HebbianLayer(nn.Linear):
+class HLayer(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, device=None, dtype=None):
         super().__init__(in_features, out_features, bias, device, dtype)
         self.hebbian_weights = nn.Parameter(torch.ones(num_classes, out_features).cuda())  # num_classes x number of nuerons
@@ -48,10 +49,10 @@ class HebbianLayer(nn.Linear):
         return self.forward(positive_input).detach(), self.forward(negative_input).detach()
 
 
-class HebbianNetwork(nn.Module):
+class HFF(nn.Module):
     def __init__(self, layers_config):
         super().__init__()
-        self.layers = nn.ModuleList([HebbianLayer(layers_config[i], layers_config[i+1]).cuda() for i in range(len(layers_config) - 1)])
+        self.layers = nn.ModuleList([HLayer(layers_config[i], layers_config[i+1]).cuda() for i in range(len(layers_config) - 1)])
 
     def create_data(self, data, label, seed=None):
         if seed is not None:
@@ -73,7 +74,7 @@ class HebbianNetwork(nn.Module):
         return positive_data , negative_data
 
     def train_network(self, training_data, training_data_label):
-        for epoch in range(2):
+        for epoch in range(1):
             print(f'Epoch {epoch + 1}')
             goodness_pos, goodness_neg = self.create_data(training_data, training_data_label) #  postivtve and negative generation
             positive_labels = nn.Parameter(goodness_pos[:, :num_classes].cuda())
@@ -83,19 +84,31 @@ class HebbianNetwork(nn.Module):
                 print(f'Training Layer {i}...')
                 goodness_pos, goodness_neg = layer.train_layer(goodness_pos, goodness_neg, positive_labels, negative_labels)
 
-    def predict(self, input_data):
+    def predict(self, input_data): # one pass version
         goodness_per_label = []
-        for label in range(num_classes): 
-            marked_data = self.mark_data(input_data, label)
-            goodness_values = []
-            for layer in self.layers:
-                marked_data = layer(marked_data)
-                hebbian_weight = layer.hebbian_weights[label, :]
-                goodness_value = (marked_data * hebbian_weight).mean(1)
-                goodness_values.append(goodness_value)
-            goodness_per_label.append(torch.sum(torch.stack(goodness_values), dim=0).unsqueeze(1))
-        goodness_per_label = torch.cat(goodness_per_label, 1)
-        return goodness_per_label.argmax(dim=1)
+        for layer in self.layers:
+            input_data = layer(input_data)  # process the data once for all labels
+            hebbian_weights = layer.hebbian_weights  # [num_classes, num_neurons]
+            # compute goodness for all labels at once (matrix multiplication for all classes simultaneously)
+            goodness_value = torch.mm(input_data, hebbian_weights.T)  # Shape: [batch_size, num_classes]
+            goodness_per_label.append(goodness_value)
+        total_goodness = torch.stack(goodness_per_label, dim=0).sum(dim=0)  # Sum across layers
+        return total_goodness.argmax(dim=1)
+    
+    # def predict(self, input_data): # multiple pass version
+    #     goodness_per_label = []
+    #     for label in range(num_classes): 
+    #         marked_data = self.mark_data(input_data, label)
+    #         goodness_values = []
+    #         for layer in self.layers:
+    #             marked_data = layer(marked_data)
+    #             hebbian_weight = layer.hebbian_weights[label, :]
+    #             goodness_value = (marked_data * hebbian_weight).mean(1)
+    #             goodness_values.append(goodness_value)
+    #         goodness_per_label.append(torch.sum(torch.stack(goodness_values), dim=0).unsqueeze(1))
+    #     goodness_per_label = torch.cat(goodness_per_label, 1)
+    #     return goodness_per_label.argmax(dim=1)
+
 
     def mark_data(self, input_data, label):
         marked_data = input_data.clone()
@@ -105,7 +118,7 @@ class HebbianNetwork(nn.Module):
 
 
 # Data loading function for MNIST
-def load_MNIST_data(train_batch_size=5000, test_batch_size=1000):
+def load_MNIST_data(train_batch_size=50000, test_batch_size=10000):
     data_transformation = Compose([
         ToTensor(),
         Normalize((0.1307,), (0.3081,)),
@@ -139,7 +152,8 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     torch.manual_seed(1234)
     training_data, training_data_label, testing_data, testing_data_label = prepare_data()
-    network = HebbianNetwork([784, 500, 123 , 321]).cuda()  # Use num_classes
+    network = HFF([784, 1000, 1000]).cuda()  # Use num_classes
     network.train_network(training_data, training_data_label) # this now only take in traing data and label, postive and neg is generated within network
     print("Training Accuracy: ", network.predict(training_data).eq(training_data_label).float().mean().item())
     print("Testing Accuracy: ", network.predict(testing_data).eq(testing_data_label).float().mean().item())
+
