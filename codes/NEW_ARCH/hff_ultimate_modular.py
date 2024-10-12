@@ -84,15 +84,15 @@ class HFF(nn.Module):
                 print(f'Training Layer {i}...')
                 goodness_pos, goodness_neg = layer.train_layer(goodness_pos, goodness_neg, positive_labels, negative_labels)
 
-    def predict(self, input_data): # one pass version
+    def predict(self, input_data): # one pass version like mentioned in our paper
         goodness_per_label = []
         for layer in self.layers:
             input_data = layer(input_data)  # process the data once for all labels
             hebbian_weights = layer.hebbian_weights  # [num_classes, num_neurons]
-            # compute goodness for all labels at once (matrix multiplication for all classes simultaneously)
-            goodness_value = torch.mm(input_data, hebbian_weights.T)  # Shape: [batch_size, num_classes]
+            # compute goodness for all labels at once
+            goodness_value = torch.mm(input_data, hebbian_weights.T)  # Gij = Ain x Hijn
             goodness_per_label.append(goodness_value)
-        total_goodness = torch.stack(goodness_per_label, dim=0).sum(dim=0)  # Sum across layers
+        total_goodness = torch.stack(goodness_per_label, dim=0).sum(dim=0)  # Gj = sum(Gij)
         return total_goodness.argmax(dim=1)
     
     # def predict(self, input_data): # multiple pass version
