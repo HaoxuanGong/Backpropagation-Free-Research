@@ -7,6 +7,7 @@ from tqdm import tqdm
 import torch.nn as nn
 from torch.optim import Adam
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Define the number of classes and epochs globally
 num_classes = 10
@@ -58,23 +59,31 @@ class HFF(nn.Module):
             random.seed(seed)
             
         negative_data = data.clone()
-        negative_data[:, :num_classes] = 0.0
+        neg_label = data.clone()
+        neg_label[:, :num_classes] = 0.0
         for i in range(negative_data.shape[0]):
             possible_answers = list(range(num_classes))
             possible_answers.remove(label[i])
             false_label = random.choice(possible_answers)
             negative_data[i][false_label] = negative_data.max()
-        return negative_data
+            neg_label[i][false_label] = 1.0
+        
+        neg_label = neg_label[:, :num_classes]
+        return negative_data , neg_label
     
     def create_pos_data(self, data, label, seed=None):
         if seed is not None:
             random.seed(seed)
 
         positive_data = data.clone()
-        positive_data[:, :num_classes] = 0.0
+        pos_label = data.clone()
+        pos_label[:, :num_classes] = 0.0
         for i in range(positive_data.shape[0]):
             positive_data[i][label[i]] = positive_data.max()
-        return positive_data
+            pos_label[i][label[i]] = 1.0
+
+        pos_label = pos_label[:, :num_classes]
+        return positive_data , pos_label
 
     def train_network(self, training_data_loader, neg_shuffle):
         # Outer loop for reshuffling negative samples
@@ -82,11 +91,12 @@ class HFF(nn.Module):
             for batch_idx, (training_data, training_data_label) in enumerate(tqdm(training_data_loader, desc=f'Training Network Epoch {epoch + 1}')):
                 # the 50000 batch size is now slice down to mini batches
                 training_data, training_data_label = training_data.cuda(), training_data_label.cuda()
-                goodness_pos = self.create_pos_data(training_data, training_data_label) # [512 ]
-                goodness_neg = self.create_neg_data(training_data, training_data_label)
-                positive_labels = nn.Parameter(goodness_pos[:, :num_classes].cuda())
-                negative_labels = nn.Parameter(goodness_neg[:, :num_classes].cuda())
-
+                goodness_pos , pos = self.create_pos_data(training_data, training_data_label) # [512 ]
+                goodness_neg , neg = self.create_neg_data(training_data, training_data_label)
+                positive_labels = nn.Parameter(pos.cuda())
+                negative_labels = nn.Parameter(neg.cuda())
+                # for data, name in zip([goodness_pos, goodness_neg], ['pos', 'neg']):
+                #         visualize_sample(data, name)
                 # Mini-batch training loop
                 for i, layer in enumerate(self.layers):
                     goodness_pos, goodness_neg = layer.train_layer(goodness_pos, goodness_neg, positive_labels, negative_labels, i)
@@ -143,6 +153,13 @@ def load_MNIST_data(train_batch_size=5000, test_batch_size=512):
     )
     return training_data_loader, testing_data_loader
 
+def visualize_sample(data, name='', idx=0):
+    reshaped = data[idx].cpu().reshape(28, 28)
+    plt.figure(figsize = (4, 4))
+    plt.title(name)
+    plt.imshow(reshaped, cmap="gray")
+    plt.show()
+
 # Prepare the data
 def prepare_data():
     torch.manual_seed(4321)
@@ -153,6 +170,6 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     torch.manual_seed(1234)
     training_data_loader, testing_data_loader = prepare_data()
-    network = HFF([784, 800, 800]).cuda()
-    network.train_network(training_data_loader, neg_shuffle=10)
+    network = HFF([784, 500, 500]).cuda()
+    network.train_network(training_data_loader, neg_shuffle=6)
     network.test_network(testing_data_loader)
