@@ -6,12 +6,15 @@ from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 from tqdm import tqdm
 import torch.nn as nn
 from torch.optim import Adam, RMSprop
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 #from load_data import prepare_data
 
 # Define the number of classes and epochs globally
 NUM_CLASSES = 10
 EPOCHS = 300
-TRAIN_BATCH_SIZE = 10000
+TRAIN_BATCH_SIZE = 1000
 TEST_BATCH_SIZE = 1000
 SHUFFLE = 1
 
@@ -37,6 +40,7 @@ class HLayer(nn.Linear):
     
     def soft_plus(self, positive_goodness, negative_goodness):
         return torch.log(1 + torch.exp(torch.cat([-positive_goodness + 2.0, negative_goodness - 2.0]))).mean()
+
 
     def train_layer(self, positive_input, negative_input, pos_labels, neg_labels, i):
         for _ in tqdm(range(EPOCHS), desc=f'Training Layer {i}'):
