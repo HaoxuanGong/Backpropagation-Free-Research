@@ -10,8 +10,9 @@ from torch.optim import Adam
 # Define the number of classes and epochs globally
 NUM_CLASSES = 10
 EPOCHS = 300
-TRAIN_BATCH_SIZE = 10000
-TEST_BATCH_SIZE = 1000
+TRAIN_BATCH_SIZE = 50000
+TEST_BATCH_SIZE = 10000
+SHUFFLE = 1
 
 class HLayer(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, device=None, dtype=None):
@@ -69,27 +70,22 @@ class HLayer(nn.Linear):
 
         return self.forward(positive_input).detach(), self.forward(negative_input).detach()
 
-
-
 class HFF(nn.Module):
     layer_differences = torch.zeros(TRAIN_BATCH_SIZE, 10).cuda()  # Adjust layer_differences to current batch size
     def __init__(self, layers_config):
         super().__init__()
         self.layers = nn.ModuleList([HLayer(layers_config[i], layers_config[i+1]).cuda() for i in range(len(layers_config) - 1)])
     
-
-
     def create_neg_data(self, data, label, seed=None):
         if seed is not None:
-            random.seed(seed)
-            
+            random.seed(seed)            
         negative_data = data.clone()
         neg_label = torch.zeros(data.size(0), NUM_CLASSES)
         for i in range(negative_data.shape[0]):
             possible_answers = list(range(NUM_CLASSES))
             possible_answers.remove(label[i].item())
             false_label = random.choice(possible_answers)
-            #negative_data[i, false_label] = 1
+            #negative_data[i, false_label] = 1 # commonet for no onehot encoding at all
             neg_label[i, false_label] = 1
         return negative_data, neg_label
     
@@ -99,7 +95,7 @@ class HFF(nn.Module):
         positive_data = data.clone()
         pos_label = torch.zeros(data.size(0), NUM_CLASSES)
         for i in range(positive_data.shape[0]):
-            #positive_data[i][label[i]] = 1
+            #positive_data[i][label[i]] = 1 # commonet for no onehot encoding at all
             pos_label[i][label[i]] = 1
         return positive_data , pos_label
 
@@ -109,12 +105,27 @@ class HFF(nn.Module):
         neg_data, neg = self.create_neg_data(training_data.cuda(), training_data_label.cuda())  # Negative data
         positive_labels = nn.Parameter(pos.cuda())
         negative_labels = nn.Parameter(neg.cuda())
-        for epoch in range(2):  # Training epochs
+        for epoch in range(SHUFFLE):  # Training epochs
             print(f'Epoch {epoch + 1}')
             goodness_pos = pos_data
             goodness_neg = neg_data
             for i, layer in enumerate(self.layers):
                 goodness_pos, goodness_neg = layer.train_layer(goodness_pos, goodness_neg, positive_labels, negative_labels, i)
+
+    def test_network(self, testing_data_loader):
+        total_correct = 0
+        total_samples = 0
+        with torch.no_grad():
+            for testing_data, testing_data_label in testing_data_loader:
+                testing_data, testing_data_label = testing_data.cuda(), testing_data_label.cuda()
+                
+                predictions = self.predict(testing_data)
+                total_correct += predictions.eq(testing_data_label).sum().item()
+                total_samples += testing_data_label.size(0)
+
+        accuracy = total_correct / total_samples
+        print(f"Testing Accuracy: {accuracy * 100:.2f}%")
+        return accuracy
 
     def predict(self, input_data):
         goodness_per_label = []
@@ -126,7 +137,6 @@ class HFF(nn.Module):
         total_goodness = torch.stack(goodness_per_label, dim=0).sum(dim=0)  # Gj = sum(Gij)
         return total_goodness.argmax(dim=1)
 
-
 # Data loading function for MNIST
 def load_MNIST_data(train_batch_size=TRAIN_BATCH_SIZE, test_batch_size=TEST_BATCH_SIZE):
     data_transformation = Compose([
@@ -134,16 +144,19 @@ def load_MNIST_data(train_batch_size=TRAIN_BATCH_SIZE, test_batch_size=TEST_BATC
         Normalize((0.1307,), (0.3081,)),
         Lambda(lambda x: torch.flatten(x))  # Flattening the 28x28 images into 1D vectors
     ])
+
     training_data_loader = DataLoader(
         MNIST('./data/', train=True, download=True, transform=data_transformation),
         batch_size=train_batch_size,
         shuffle=True
     )
+
     testing_data_loader = DataLoader(
         MNIST('./data/', train=False, download=True, transform=data_transformation),
         batch_size=test_batch_size,
         shuffle=False
     )
+
     return training_data_loader, testing_data_loader
 
 
