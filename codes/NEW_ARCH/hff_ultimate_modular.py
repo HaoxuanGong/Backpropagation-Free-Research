@@ -76,44 +76,27 @@ class HFF(nn.Module):
             false_label = random.choice(possible_answers)
             #negative_data[i, false_label] = negative_data.max() # commonet for no onehot encoding at all
             neg_label[i, false_label] = 1.0
-        return negative_data, neg_label
+        return negative_data.cuda(), neg_label.cuda()
     
-    def create_pos_data(self, data, label, seed=None):
-        if seed is not None:
-            random.seed(seed)
+    def create_pos_data(self, data, label):
         positive_data = data.clone()
         pos_label = torch.zeros(data.size(0), NUM_CLASSES)
         for i in range(positive_data.shape[0]):
             #positive_data[i][label[i]] = positive_data.max() # commonet for no onehot encoding at all
             pos_label[i][label[i]] = 1.0
-        return positive_data , pos_label
+        return positive_data.cuda() , pos_label.cuda()
 
     def train_network(self, training_data, training_data_label):
-        pos_data, pos = self.create_pos_data(training_data.cuda(), training_data_label.cuda())  # Positive data
-        neg_data, neg = self.create_neg_data(training_data.cuda(), training_data_label.cuda())  # Negative data
-        positive_labels = nn.Parameter(pos.cuda())
-        negative_labels = nn.Parameter(neg.cuda())
+        pos_data, pos = self.create_pos_data(training_data, training_data_label)  # Positive data
+        neg_data, neg = self.create_neg_data(training_data, training_data_label)  # Negative data
+        positive_labels = nn.Parameter(pos)
+        negative_labels = nn.Parameter(neg)
         for epoch in range(SHUFFLE):  # Training epochs
             print(f'Epoch {epoch + 1}')
             goodness_pos = pos_data
             goodness_neg = neg_data
             for i, layer in enumerate(self.layers):
                 goodness_pos, goodness_neg = layer.train_layer(goodness_pos, goodness_neg, positive_labels, negative_labels, i)
-
-    def test_network(self, testing_data_loader):
-        total_correct = 0
-        total_samples = 0
-        with torch.no_grad():
-            for testing_data, testing_data_label in testing_data_loader:
-                testing_data, testing_data_label = testing_data.cuda(), testing_data_label.cuda()
-                
-                predictions = self.predict(testing_data)
-                total_correct += predictions.eq(testing_data_label).sum().item()
-                total_samples += testing_data_label.size(0)
-
-        accuracy = total_correct / total_samples
-        print(f"Testing Accuracy: {accuracy * 100:.2f}%")
-        return accuracy
 
     def predict(self, input_data):
         goodness_per_label = []
