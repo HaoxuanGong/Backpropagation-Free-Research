@@ -1,7 +1,7 @@
 import random
 import torch
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST, CIFAR100
+from torchvision.datasets import MNIST, CIFAR100 , EMNIST # emnist has 62 classes
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 from tqdm import tqdm
 import torch.nn as nn
@@ -11,7 +11,10 @@ import matplotlib.pyplot as plt
 
 # Define the number of classes and epochs globally
 num_classes = 10
-epochs_layer = 200  # Number of outer epochs for negative sample reshuffling
+EPOCHS = 800  # Number of outer epochs for negative sample reshuffling
+SHUFFLE = 4
+NUM_CLASSES = 10
+
 
 class HLayer(nn.Linear):
     def __init__(self, in_features, out_features, bias=True, device=None, dtype=None):
@@ -28,13 +31,18 @@ class HLayer(nn.Linear):
 
     def compute_goodness(self, label, hebbian_weight, output):
         return (torch.mm(label, hebbian_weight) * output).mean(1)
+    
+    # def compute_goodness(self, labels, hebbian_weights, output):
+    #     positive_goodness =  (torch.mm(labels, hebbian_weights) * output).mean(1)
+    #     negative_goodness = (torch.mm(1 - labels, hebbian_weights / 10) * output).mean(1)
+    #     return positive_goodness , negative_goodness
 
-    def train_layer(self, positive_input, negative_input, pos_labels, neg_labels , i):
-        for epoch in (range(epochs_layer)): # epoch for porcessing input
-            positive_output = self.forward(positive_input)  # Forward pass
-            negative_output = self.forward(negative_input)
-            positive_goodness = self.compute_goodness(pos_labels, self.hebbian_weights, positive_output)
-            negative_goodness = self.compute_goodness(neg_labels, self.hebbian_weights, negative_output)
+    def train_layer(self, input, pos_labels, neg_labels , i):
+        for _ in (range(EPOCHS)):
+            output = self.forward(input)
+            #positive_goodness , negative_goodness = self.compute_goodness(pos_labels, self.hebbian_weights, output)
+            positive_goodness = self.compute_goodness(pos_labels, self.hebbian_weights, output)
+            negative_goodness = self.compute_goodness(neg_labels, self.hebbian_weights, output)
             
             loss = torch.log(1 + torch.exp(torch.cat([
                 -positive_goodness + 0.0,  # threshold = 0
@@ -46,7 +54,8 @@ class HLayer(nn.Linear):
             loss.backward()
             self.optimizer.step()
             self.hebbian_optimizer.step()
-        return self.forward(positive_input).detach(), self.forward(negative_input).detach()
+
+        return self.forward(input).detach()
 
 
 class HFF(nn.Module):
@@ -54,52 +63,25 @@ class HFF(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList([HLayer(layers_config[i], layers_config[i+1]).cuda() for i in range(len(layers_config) - 1)])
 
-    def create_neg_data(self, data, label, seed=None):
-        if seed is not None:
-            random.seed(seed)
-            
-        negative_data = data.clone()
-        neg_label = data.clone()
-        neg_label[:, :num_classes] = 0.0
-        for i in range(negative_data.shape[0]):
-            possible_answers = list(range(num_classes))
-            possible_answers.remove(label[i])
-            false_label = random.choice(possible_answers)
-            negative_data[i][false_label] = negative_data.max()
-            neg_label[i][false_label] = 1.0
+    def create_labels(self, label):
+        batch_size = label.size(0)
+        neg_label = torch.zeros(batch_size, NUM_CLASSES, device=label.device)
+        random_neg_labels = torch.randint(0, NUM_CLASSES, (batch_size,), device=label.device)
+        random_neg_labels = torch.where(random_neg_labels == label, (random_neg_labels + 1) % NUM_CLASSES, random_neg_labels)
+        neg_label.scatter_(1, random_neg_labels.unsqueeze(1), 1.0)
+        pos_label = torch.zeros(batch_size, NUM_CLASSES, device=label.device)
+        pos_label.scatter_(1, label.unsqueeze(1), 1.0)
         
-        neg_label = neg_label[:, :num_classes]
-        return negative_data , neg_label
-    
-    def create_pos_data(self, data, label, seed=None):
-        if seed is not None:
-            random.seed(seed)
+        return pos_label , neg_label
 
-        positive_data = data.clone()
-        pos_label = data.clone()
-        pos_label[:, :num_classes] = 0.0
-        for i in range(positive_data.shape[0]):
-            positive_data[i][label[i]] = positive_data.max()
-            pos_label[i][label[i]] = 1.0
-
-        pos_label = pos_label[:, :num_classes]
-        return positive_data , pos_label
-
-    def train_network(self, training_data_loader, neg_shuffle):
-        # Outer loop for reshuffling negative samples
-        for epoch in range(neg_shuffle):
-            for batch_idx, (training_data, training_data_label) in enumerate(tqdm(training_data_loader, desc=f'Training Network Epoch {epoch + 1}')):
-                # the 50000 batch size is now slice down to mini batches
-                training_data, training_data_label = training_data.cuda(), training_data_label.cuda()
-                goodness_pos , pos = self.create_pos_data(training_data, training_data_label) # [512 ]
-                goodness_neg , neg = self.create_neg_data(training_data, training_data_label)
-                positive_labels = nn.Parameter(pos.cuda())
-                negative_labels = nn.Parameter(neg.cuda())
-                # for data, name in zip([goodness_pos, goodness_neg], ['pos', 'neg']):
-                #         visualize_sample(data, name)
-                # Mini-batch training loop
+    def train_network(self, train_loader):
+        for epoch in range(SHUFFLE):  # Training epochs
+            for batch_data, batch_labels in tqdm(train_loader, desc=f'Epoch {epoch + 1}'):
+                positive_labels , negative_lables = self.create_labels(batch_labels.cuda())
+                goodness_pos = batch_data.cuda()
                 for i, layer in enumerate(self.layers):
-                    goodness_pos, goodness_neg = layer.train_layer(goodness_pos, goodness_neg, positive_labels, negative_labels, i)
+                    goodness_pos = layer.train_layer(goodness_pos, positive_labels, negative_lables , i) 
+
 
     def test_network(self, testing_data_loader):
         total_correct = 0
@@ -128,14 +110,8 @@ class HFF(nn.Module):
         total_goodness = torch.stack(goodness_per_label, dim=0).sum(dim=0)  # Gj = sum(Gij)
         return total_goodness.argmax(dim=1)
 
-    def mark_data(self, input_data, label):
-        marked_data = input_data.clone()
-        marked_data[:, :num_classes] = 0.0
-        marked_data[:, label] = 1
-        return marked_data
-
 # Data loading function for MNIST
-def load_MNIST_data(train_batch_size=5000, test_batch_size=512):
+def load_MNIST_data(train_batch_size=2048, test_batch_size=512):
     data_transformation = Compose([
         ToTensor(),
         Normalize((0.1307,), (0.3081,)),
@@ -170,6 +146,6 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
     torch.manual_seed(1234)
     training_data_loader, testing_data_loader = prepare_data()
-    network = HFF([784, 500, 500]).cuda()
-    network.train_network(training_data_loader, neg_shuffle=6)
+    network = HFF([784, 2048, 1024]).cuda()
+    network.train_network(training_data_loader)
     network.test_network(testing_data_loader)
